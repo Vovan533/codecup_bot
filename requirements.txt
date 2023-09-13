@@ -1,0 +1,4 @@
+aiogram
+magic-filter
+asyncpg
+python-dotenv
