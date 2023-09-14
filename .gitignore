@@ -5,3 +5,4 @@ venv
 !.p
 *.log
 *.env
+data/img/personal

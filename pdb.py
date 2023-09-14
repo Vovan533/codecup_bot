@@ -35,13 +35,14 @@ class PostSQLDB:
         )
         self.personal_table_columns = (
             ('personal_id', 'SERIAL PRIMARY KEY'),
-            ('name', 'VARCHAR(255)'),
+            ('status', 'VARCHAR(255)'),
+            ('first_name', 'VARCHAR(255)'),
             ('last_name', 'VARCHAR(255)'),
             ('middle_name', 'VARCHAR(255)'),
             ('full_name', 'VARCHAR(765)'),
             ('project', 'VARCHAR(255)'),
             ('position', 'VARCHAR(255)'),
-            ('avatar_path', 'VARCHAR(255)'),
+            ('avatar', 'VARCHAR(255)'),
             ('time_join', 'FLOAT'),
             ('time_registered', 'FLOAT'),
         )
@@ -133,12 +134,30 @@ class PostSQLDB:
     # (https://github.com/MagicStack/asyncpg/issues/822).
 
     async def get_personal_by_name(self, name: str, active: bool = True):
+        sql = f"SELECT * FROM personal WHERE (first_name LIKE '{name.lower()}' " \
+              f"OR last_name LIKE '{name.lower()}' " \
+              f"OR middle_name LIKE '{name.lower()}' " \
+              f"OR full_name LIKE '%{name.lower()}%')"
         if active:
-            return await self.fetchone(f"SELECT * FROM personal WHERE {name} IN full_name AND status = 'active';")
-        return await self.fetchone(f"SELECT * FROM personal WHERE {name} IN full_name;")
+            add = " AND status = 'active';"
+            return await self.fetch(sql + add)
+        return await self.fetch(sql + ';')
 
-    async def add_personal(self, first_name: str, last_name: str, middle_name: str, position: str,
-                           project: str, time_join: float, avatar: str = 'None'):
-        return await self.fetchone(f"INSERT INTO personal (first_name, last_name, middle_name, position, project, "
-                                   f"time_join, avatar) VALUES('{first_name}', '{last_name}', '{middle_name}', "
-                                   f"'{position}', '{project}', {time_join}, '{avatar}') RETURNING personal_id;")
+    async def add_personal(self, first_name: str, last_name: str, middle_name: str, full_name: str, position: str,
+                           project: str, time_join: float, avatar: str = 'Null'):
+        return await self.fetchone(f"INSERT INTO personal (first_name, last_name, middle_name, full_name, position, "
+                                   f"project, time_join, avatar, status) VALUES('{first_name.lower()}', '{last_name.lower()}', "
+                                   f"'{middle_name.lower()}', '{full_name.lower()}', "
+                                   f"'{position}', '{project}', {time_join}, '{avatar}', 'active') RETURNING personal_id;")
+
+    async def change_personal(self, personal_id: int, parameter: str, value):
+        add = ('', '')
+        if isinstance(value, str):
+            add = ("'", "'")
+        elif isinstance(value, list):
+            add = ('ARRAY', '')
+        return await self.execute(f"UPDATE personal SET {parameter} = {add[0]}{value}{add[1]} "
+                                  f"WHERE personal_id = {personal_id};")
+
+    async def del_personal(self, personal_id: int):
+        return await self.execute(f"UPDATE personal SET status = 'deleted' WHERE personal_id = {personal_id}")
