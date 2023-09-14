@@ -120,7 +120,7 @@ async def avatar_handler(message: types.Message, state: FSMContext):
     data['avatar'] = path
     await state.set_data(data)
     await state.set_state(AddPersonal.join_time)
-    return await message.reply(f"Аватарка сохранена.\n\nШаг 5 из 5.\nОтправьте дату прихода сотрудника в формате"
+    return await message.reply(f"Аватарка сохранена.\n\nШаг 5 из 5.\nОтправьте дату прихода сотрудника в формате "
                                f"дд.мм.гггг или нажмите <b>«Сегодня»</b> для указания сегодняшнего дня.",
                                reply_markup=kb.today_kb)
 
@@ -135,7 +135,7 @@ async def avatar_other_handler(message: types.Message, state: FSMContext):
         await state.set_data(data)
         await state.set_state(AddPersonal.join_time)
         return await message.reply(f"Добавление аватарки пропущено."
-                                   f"\n\nШаг 5 из 5.\nОтправьте дату прихода сотрудника в формате"
+                                   f"\n\nШаг 5 из 5.\nОтправьте дату прихода сотрудника в формате "
                                    f"дд.мм.гггг или нажмите <b>«Сегодня»</b> для указания сегодняшнего дня.",
                                    reply_markup=kb.today_kb)
 
