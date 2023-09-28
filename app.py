@@ -1,6 +1,6 @@
 import config
 import atexit
-from loader import dp, bot, db, connect_db, logger
+from loader import dp, bot, connect_db, logger
 import time
 import datetime
 import asyncio

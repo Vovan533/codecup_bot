@@ -1,5 +1,7 @@
 import os
 import asyncpg as apg
+
+import config
 from loader import logger
 from asyncpg.exceptions import UndefinedTableError, InterfaceError
 import time
@@ -31,6 +33,7 @@ class PostSQLDB:
         self.users_table_columns = (
             ('user_id', 'BIGINT PRIMARY KEY'),
             ('status', 'VARCHAR(255)'),
+            ('role', 'VARCHAR(255)'),
             ('time_registered', 'FLOAT'),
         )
         self.personal_table_columns = (
@@ -89,9 +92,9 @@ class PostSQLDB:
                 return None
         except InterfaceError as ex:
             if 'another operation is in progress' in str(ex):
-                logger.info(f"another db operation in progress, waiting 1sec and trying again... (sql: {sql})")
-                await asyncio.sleep(1)
-                await self.execute(sql, rerun=True, fetch=fetch)
+                logger.info(f"another db operation in progress, waiting 0.2 sec and trying again... (sql: {sql})")
+                await asyncio.sleep(0.2)
+                await self.execute(sql, fetch=fetch)
         except Exception as ex:
             logger.error(f'Error while executing db method. (errmsg: {ex}, sql: {sql})', exc_info=True)
             raise
@@ -113,19 +116,39 @@ class PostSQLDB:
         return await self.fetch(f"SELECT * FROM users;")
 
     async def add_user(self, user_id: int):
+        if user_id in config.ADMINS:
+            role = "admin"
+        else:
+            role = "user"
         return await self.execute(
-            f"INSERT INTO users (user_id, time_registered, status) "
-            f"VALUES({user_id}, {time.time()}, 'active');")
+            f"INSERT INTO users (user_id, time_registered, status, role) "
+            f"VALUES({user_id}, {time.time()}, 'active', {role});")
 
     async def set_user_status(self, user_id: int, value: str):
         return await self.execute(f"UPDATE users SET status = '{value}' WHERE user_id = {user_id};")
 
+    async def set_user_role(self, user_id: int, value: str):
+        return await self.execute(f"UPDATE users SET role = '{value}' WHERE user_id = {user_id};")
+
     # === Personal ===
 
-    async def get_personal(self, active: bool = True):
+    async def get_personal(self, active: bool = True, project=False, position=False):
+        add = ""
         if active:
-            return await self.fetch(f"SELECT * FROM personal WHERE status = 'active';")
-        return await self.fetch(f"SELECT * FROM personal;")
+            add = " WHERE status = 'active'"
+        if project:
+            if 'WHERE' in add:
+                add += " AND"
+            else:
+                add += " WHERE"
+            add += f" project = '{project}'"
+        if position:
+            if 'WHERE' in add:
+                add += " AND"
+            else:
+                add += " WHERE"
+            add += f" position = '{position}'"
+        return await self.fetch(f"SELECT * FROM personal {add};")
 
     async def get_personal_by_id(self, personal_id: int):
         return await self.fetchone(f"SELECT * FROM personal WHERE personal_id = {personal_id};")
@@ -133,15 +156,30 @@ class PostSQLDB:
     # Защита от SQL инъекций не требуется, так как имеется встроенная, в самой библиотеке для работы с базой данных
     # (https://github.com/MagicStack/asyncpg/issues/822).
 
-    async def get_personal_by_name(self, name: str, active: bool = True):
+    async def get_personal_by_name(self, name: str, active: bool = True, project=False, position=False,
+                                   time_search: tuple[float] = (0, 0)):
         sql = f"SELECT * FROM personal WHERE (first_name LIKE '{name.lower()}' " \
               f"OR last_name LIKE '{name.lower()}' " \
               f"OR middle_name LIKE '{name.lower()}' " \
               f"OR full_name LIKE '%{name.lower()}%')"
+        add = ''
         if active:
-            add = " AND status = 'active';"
-            return await self.fetch(sql + add)
-        return await self.fetch(sql + ';')
+            add += " AND status = 'active'"
+        if project:
+            add += f" AND LOWER(project) = '{project}'"
+        if position:
+            add += f" AND LOWER(position) = '{position}'"
+        add += f" AND time_join BETWEEN {time_search[0]} AND {time_search[1]}"
+        return await self.fetch(sql + add + ';')
+
+    async def get_personal_by_time(self, active: bool = True, project=False, position=False,
+                                   time_search: tuple[float] = (0, 0)):
+        add = ''
+        if active:
+            add += " WHERE status = 'active'"
+        if 'WHERE' in add:
+            add += f" AND time_join BETWEEN {time_search[0]} AND {time_search[1]}"
+        return await self.fetch(f"SELECT * FROM personal {add};")
 
     async def add_personal(self, first_name: str, last_name: str, middle_name: str, full_name: str, position: str,
                            project: str, time_join: float, avatar: str = 'Null'):
@@ -161,3 +199,23 @@ class PostSQLDB:
 
     async def del_personal(self, personal_id: int):
         return await self.execute(f"UPDATE personal SET status = 'deleted' WHERE personal_id = {personal_id}")
+
+    async def get_projects_personal(self) -> dict:
+        personal = await self.get_personal(active=True)
+        res = {}
+        for pers in personal:
+            if pers['project'] not in res:
+                res[pers['project']] = [pers['personal_id']]
+            else:
+                res[pers['project']].append(pers['personal_id'])
+        return res
+
+    async def get_positions_personal(self) -> dict:
+        personal = await self.get_personal(active=True)
+        res = {}
+        for pers in personal:
+            if pers['position'] not in res:
+                res[pers['position']] = [pers['personal_id']]
+            else:
+                res[pers['position']].append(pers['personal_id'])
+        return res

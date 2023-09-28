@@ -35,6 +35,62 @@ main_kb = InlineKeyboardMarkup(inline_keyboard=[
     ],
 ])
 
+search_kb = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(text="👤 Поиск по ФИО", callback_data="search:name")
+    ],
+    [
+        InlineKeyboardButton(text="🗂 Поиск по проекту", callback_data="search:project")
+    ],
+    [
+        InlineKeyboardButton(text="🗂👨‍💼 Поиск внутри проекта", callback_data="search:project_user")
+    ],
+    [
+        InlineKeyboardButton(text="👨‍💼 Поиск по должности", callback_data="search:position")
+    ],
+    [
+        InlineKeyboardButton(text="🕓 Поиск по времени прихода", callback_data="search:time")
+    ],
+    [
+        InlineKeyboardButton(text="🔙 Назад", callback_data="main:back")
+    ]
+])
+
+search_proj_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="📋 Списки по проектам", callback_data="search:project")
+        ]
+])
+
+search_pos_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="📋 Списки по должностям", callback_data="search:position_list")
+        ]
+])
+
+
+async def create_project_search_kb(projects: dict) -> InlineKeyboardMarkup | None:
+    if not projects:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔙 В меню поиска", callback_data="main:search")
+    ]] + [
+        [
+            InlineKeyboardButton(text=project, callback_data=f"search:s_project:{project}")
+        ] for project in projects
+    ])
+
+
+async def create_position_search_kb(positions: dict) -> InlineKeyboardMarkup | None:
+    if not positions:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔙 В меню поиска", callback_data="main:search")
+    ]] + [
+        [
+            InlineKeyboardButton(text=pos, callback_data=f"search:s_pos:{pos}")
+        ] for pos in positions
+    ])
+
+
 cancel_b_kb = InlineKeyboardMarkup(inline_keyboard=[
     [
         InlineKeyboardButton(text="Отменить", callback_data="cancel_b")
@@ -68,8 +124,19 @@ edit_kb = InlineKeyboardMarkup(inline_keyboard=[
 
 # Список выводит до 99 сотрудников, возможна последующая доработка, до вывода любого кол-ва через создание страниц.
 
-async def create_personal_list_kb(personal: list) -> InlineKeyboardMarkup:
-    kb = [[InlineKeyboardButton(text="🔙 Назад", callback_data="main:back")]]
+async def create_personal_list_kb(personal: list, search: bool = False) -> InlineKeyboardMarkup:
+    kb = [
+        [
+            InlineKeyboardButton(text="🔙 Главное меню", callback_data="main:back")
+        ],
+    ]
+    if not search:
+        kb.append([
+            InlineKeyboardButton(text="🗂 Открыть списки по проектам", callback_data="search:project")
+        ])
+        kb.append([
+            InlineKeyboardButton(text="👨‍💼 Открыть списки по должности", callback_data="search:position_list")
+        ])
     if personal:
         for pers in personal:
             kb.append([InlineKeyboardButton(text=pers['full_name'].title(),
@@ -77,15 +144,19 @@ async def create_personal_list_kb(personal: list) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-async def create_personal_kb(personal_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+async def create_personal_kb(personal_id: int, role) -> InlineKeyboardMarkup | None:
+    if personal_id == -1:
+        return None
+    kb = [
         [
-            InlineKeyboardButton(text="Редактировать", callback_data=f'pers:edit:{personal_id}')
-        ],
-        [
-            InlineKeyboardButton(text="Удалить", callback_data=f'pers:del:{personal_id}')
-        ],
-        [
-            InlineKeyboardButton(text="🔙 Назад", callback_data=f"pers:back:{personal_id}")
+            InlineKeyboardButton(text="🔙 Список всех сотрудников", callback_data=f"pers:back:{personal_id}")
         ]
-    ])
+    ]
+    if role == "admin":
+        kb.append([
+            InlineKeyboardButton(text="Редактировать", callback_data=f'pers:edit:{personal_id}')
+        ])
+        kb.append([
+            InlineKeyboardButton(text="Удалить", callback_data=f'pers:del:{personal_id}')
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
